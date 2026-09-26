@@ -34,4 +34,4 @@ Files already in `videos/` are skipped, so after adding a new chamber you only n
 
 ## License
 
-Original content is licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). AI and guest responses are preserved as records; their rights depend on each case.
+All content — chamber images, invitation texts (by Tuzi or by an AI affiliate), and videos, including every video in this repo — is licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Please credit: Tuzi and Affiliates, The Civilisation Field, with a link to https://chinsookling.github.io/tcf-chamber/. Responses from guests are kept as records; their rights depend on each case.
