@@ -27,7 +27,7 @@
 ## Size report
 
 - **Before:** 159 original videos, 1,328.8 MB (from the Phase 4 Step 0 report).
-- **After:** see "Local compression of all 159" below. The workflow also prints the before and after sizes in its run **Summary**.
+- **After:** **243.6 MB, 18% of the original** (sandbox run of all 159, below). The workflow reports its own numbers in the run **Summary**. The ffmpeg version on the runner may differ slightly, so expect a result close to this, well under the 900 MB stop.
 
 ## How to run it (for Tuzi, in this order)
 
@@ -54,7 +54,15 @@
 
 ## Local compression of all 159 (sandbox cross-check)
 
-I also compressed all 159 videos in the sandbox with the same command, to know the total size before the workflow runs. **The result is added here when it finishes.** These local files are **not** committed; the workflow makes the real ones.
+I also compressed all 159 videos in the sandbox with the same command, to know the total size before the workflow runs. These local files are **not** committed; the workflow makes the real ones.
+
+| | Result |
+|---|---|
+| Files | 159 / 159 encoded, 0 failures |
+| Before | 1,328.8 MB |
+| After | **243.6 MB (18%)** |
+| Largest compressed file | 5.2 MB (`ch088-thootb-breakthrough-gpt-chamber.mp4`) |
+| Time | 18.5 minutes on 4 CPUs. A 2-core GitHub runner will take longer, roughly 40–60 minutes. |
 
 ## Not done yet
 
