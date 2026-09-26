@@ -1,0 +1,100 @@
+# ═══════════════════════════════════════════════════════════
+# tcf-chamber-media · Compress chamber videos (manual only)
+# 1. Reads the list of chamber videos from tcf-chamber's chambers.json.
+# 2. Downloads each original from the main TCF site (public URL).
+#    Originals stay in the-Civilisation-field; nothing there changes.
+# 3. Re-encodes with the tested settings:
+#    H.264 libx264 preset slow, max 720p (shorter side), CRF 26,
+#    AAC 96k, +faststart, yuv420p. Same file names, into videos/.
+# 4. Stops if the compressed total is over 900 MB.
+# 5. Commits videos/ to main, deploys GitHub Pages, and checks that
+#    every video URL is reachable.
+# Files already in videos/ are skipped unless "force" is chosen.
+# ═══════════════════════════════════════════════════════════
+name: Compress chamber videos
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Re-encode videos that already exist in videos/"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  ORIGINALS: https://chinsookling.github.io/the-Civilisation-field/assets/videos/
+
+jobs:
+  compress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Compress
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          mkdir -p videos _orig
+          python3 tools/video_list.py > _list.txt
+          echo "videos listed: $(wc -l < _list.txt)"
+          echo "| File | Original | Compressed |" > _sizes.md
+          echo "|---|---|---|" >> _sizes.md
+          orig_total=0
+          while IFS= read -r f; do
+            if [ -s "videos/$f" ] && [ "$FORCE" != "true" ]; then echo "skip $f"; continue; fi
+            url="$ORIGINALS$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$f")"
+            curl -fsSL --retry 3 -o "_orig/$f" "$url"
+            ffmpeg -nostdin -loglevel error -y -i "_orig/$f" \
+              -c:v libx264 -preset slow -crf 26 \
+              -vf "scale='if(gte(iw,ih),-2,min(720,iw))':'if(gte(iw,ih),min(720,ih),-2)'" \
+              -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart \
+              "videos/$f"
+            o=$(stat -c%s "_orig/$f"); n=$(stat -c%s "videos/$f")
+            orig_total=$((orig_total + o))
+            echo "| $f | $o | $n |" >> _sizes.md
+            rm -f "_orig/$f"
+          done < _list.txt
+          new_total=$(du -sb videos | cut -f1)
+          echo "ORIGINAL bytes (this run): $orig_total"
+          echo "COMPRESSED bytes (videos/ total): $new_total"
+          {
+            echo "## Compression result"
+            echo ""
+            echo "- Original (encoded in this run): $orig_total bytes"
+            echo "- Compressed total in videos/: $new_total bytes"
+            echo ""
+            cat _sizes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$new_total" -gt 943718400 ]; then
+            echo "::error::Compressed total is over 900 MB. Stopping without committing."
+            exit 1
+          fi
+          rm -rf _orig _list.txt _sizes.md
+
+      - name: Commit videos to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898183+github-actions[bot]@users.noreply.github.com"
+          git add videos
+          if git diff --cached --quiet; then echo "nothing new to commit"; exit 0; fi
+          git commit -m "Compressed chamber videos (720p, CRF 26, AAC 96k)"
+          git push origin HEAD:main
+
+  deploy:
+    needs: compress
+    uses: ./.github/workflows/deploy-pages.yml

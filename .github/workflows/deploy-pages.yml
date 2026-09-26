@@ -1,0 +1,63 @@
+# ═══════════════════════════════════════════════════════════
+# tcf-chamber-media · Deploy GitHub Pages, then check every video URL
+# Runs on push to main, by hand, or after "Compress chamber videos".
+# Excludes docs/architecture/ and *.bak* (same approach as the other
+# TCF repos).
+# ═══════════════════════════════════════════════════════════
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build curated site
+        run: |
+          mkdir -p _site
+          rsync -a \
+            --exclude='.git/' --exclude='.github/' --exclude='_site/' \
+            --exclude='docs/architecture/' --exclude='*.bak*' \
+            ./ _site/
+          touch _site/.nojekyll
+          echo "videos: $(ls _site/videos 2>/dev/null | wc -l) files, $(du -sh _site/videos 2>/dev/null | cut -f1)"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Check every video URL
+        run: |
+          if [ ! -d videos ] || [ -z "$(ls videos)" ]; then echo "no videos yet; skipping check"; exit 0; fi
+          sleep 30
+          python3 tools/check_urls.py | tee -a "$GITHUB_STEP_SUMMARY"
